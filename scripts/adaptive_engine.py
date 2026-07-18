@@ -85,9 +85,9 @@ def adaptive_policy(schemes, gas_price_gwei, max_cost_usd_target, max_latency_ms
             best_scheme = name
             
     if best_scheme is None and require_pqc:
-        best_scheme = "Falcon-512"
+        best_scheme = next((k for k, v in schemes.items() if v["pqc"]), "Falcon-512")
     elif best_scheme is None:
-        best_scheme = "ECDSA (secp256k1)"
+        best_scheme = next((k for k in schemes.keys()), "ECDSA (secp256k1)")
         
     return best_scheme
 
