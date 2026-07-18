@@ -12,13 +12,19 @@ GAS_PRICES_GWEI = [10, 30, 50, 100]
 ETH_PRICE_USD = 3000.0
 UPDATES_PER_YEAR = 525600  # 1 update per minute
 
+# Financial Sensitivity Scenarios
+FINANCIAL_SCENARIOS = {
+    "Low": {"gas_gwei": 15, "eth_usd": 2000.0},
+    "Baseline": {"gas_gwei": 30, "eth_usd": 3000.0},
+    "High": {"gas_gwei": 60, "eth_usd": 4000.0},
+}
+
 # Calldata estimation (assuming 95% non-zero bytes for signature payloads)
 def calc_calldata_gas(payload_bytes):
     non_zero_bytes = int(payload_bytes * 0.95)
     zero_bytes = payload_bytes - non_zero_bytes
     return (non_zero_bytes * 16) + (zero_bytes * 4)
 
-# Precompile / Verification gas models for ALL algorithms
 VERIFY_GAS_MODELS = {
     "ECDSA (secp256k1)": {
         "unagg_func": lambda num_nodes: num_nodes * 3000,
@@ -133,8 +139,48 @@ def run_evm_gas_benchmark():
     print(f"EVM Gas benchmark results saved to {csv_path}")
     return results
 
-def generate_gas_plots(results):
-    # Include ALL 8 algorithms in the EVM Gas benchmark charts
+def run_financial_sensitivity_analysis():
+    os.makedirs("results", exist_ok=True)
+    sensitivity_results = []
+    
+    # N=21 nodes analysis across 3 scenarios
+    num_nodes = 21
+    for alg, model in VERIFY_GAS_MODELS.items():
+        fn_agg_payload = model["agg_payload"]
+        fn_agg_func = model["agg_func"]
+        
+        agg_payload = fn_agg_payload(num_nodes)
+        agg_calldata_gas = calc_calldata_gas(agg_payload)
+        agg_verify_gas = fn_agg_func(num_nodes)
+        total_agg_gas = BASE_TRANSACTION_GAS + STORAGE_EVENT_GAS + agg_calldata_gas + agg_verify_gas
+        
+        for scenario_name, sc in FINANCIAL_SCENARIOS.items():
+            gwei = sc["gas_gwei"]
+            eth_price = sc["eth_usd"]
+            
+            agg_cost_eth = (total_agg_gas * gwei) / 1e9
+            agg_cost_usd = agg_cost_eth * eth_price
+            annual_cost_usd = agg_cost_usd * UPDATES_PER_YEAR
+            
+            sensitivity_results.append({
+                "Algorithm": alg,
+                "Scenario": scenario_name,
+                "Gas_Price_Gwei": gwei,
+                "ETH_Price_USD": eth_price,
+                "Total_Agg_Gas": total_agg_gas,
+                "Tx_Cost_USD": round(agg_cost_usd, 2),
+                "Annual_Cost_USD": round(annual_cost_usd, 2)
+            })
+
+    csv_path = os.path.join("results", "pq_oracle_sensitivity_results.csv")
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=sensitivity_results[0].keys())
+        writer.writeheader()
+        writer.writerows(sensitivity_results)
+    print(f"Financial Sensitivity results saved to {csv_path}")
+    return sensitivity_results
+
+def generate_gas_plots(results, sensitivity_results):
     selected_algs = list(VERIFY_GAS_MODELS.keys())
     gwei_30_data = [r for r in results if r["Gas_Price_Gwei"] == 30 and r["Network_Nodes_N"] == 21 and r["Algorithm"] in selected_algs]
 
@@ -153,7 +199,7 @@ def generate_gas_plots(results):
     ax1.set_ylabel("Total EVM Gas per Update (kGas)", fontweight='bold')
     ax1.set_title("EVM Gas Consumption per Oracle Update (N=21)", fontweight='bold', fontsize=12)
     ax1.set_xticks(x)
-    ax2_labels = ax1.set_xticklabels(algs, rotation=35, ha='right', fontsize=9)
+    ax1.set_xticklabels(algs, rotation=35, ha='right', fontsize=9)
     ax1.grid(True, linestyle='--', alpha=0.5)
     ax1.legend()
 
@@ -174,9 +220,31 @@ def generate_gas_plots(results):
     plt.close()
     print(f"Gas plot saved to {plot_path}")
 
+    # Generate Financial Sensitivity Plot across 3 Scenarios
+    fig, ax = plt.subplots(figsize=(12, 6))
+    scenarios = ["Low", "Baseline", "High"]
+    
+    candidate_algs = ["ECDSA (secp256k1)", "BLS12-381", "Falcon-512", "ML-DSA-44", "Falcon-1024", "ML-DSA-87", "SLH-DSA-SHA2-128s"]
+    for alg in candidate_algs:
+        sub = [r for r in sensitivity_results if r["Algorithm"] == alg]
+        costs = [r["Tx_Cost_USD"] for r in sub]
+        ax.plot(scenarios, costs, marker='s', linewidth=2, label=alg)
+        
+    ax.set_xlabel("Financial & Gas Market Scenario", fontweight='bold')
+    ax.set_ylabel("Transaction Cost per Update ($ USD)", fontweight='bold')
+    ax.set_title("Financial Sensitivity Analysis across Market Conditions (N=21)", fontweight='bold', fontsize=14)
+    ax.grid(True, linestyle='--', alpha=0.5)
+    ax.legend(fontsize=9)
+    plt.tight_layout()
+    sens_plot_path = os.path.join("results", "pq_oracle_gas_sensitivity.png")
+    plt.savefig(sens_plot_path, dpi=300)
+    plt.close()
+    print(f"Sensitivity plot saved to {sens_plot_path}")
+
 def main():
     results = run_evm_gas_benchmark()
-    generate_gas_plots(results)
+    sens_results = run_financial_sensitivity_analysis()
+    generate_gas_plots(results, sens_results)
 
 if __name__ == "__main__":
     main()

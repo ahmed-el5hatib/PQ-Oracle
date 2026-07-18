@@ -1,4 +1,5 @@
 import time
+import math
 import statistics
 import csv
 import os
@@ -46,6 +47,12 @@ def count_bytes_distribution(byte_data):
     non_zero_bytes = len(byte_data) - zero_bytes
     return zero_bytes, non_zero_bytes
 
+def calc_stats(times):
+    mean_ms = statistics.mean(times) * 1000
+    stdev_ms = statistics.stdev(times) * 1000 if len(times) > 1 else 0.0
+    ci95_ms = 1.96 * (stdev_ms / math.sqrt(len(times)))
+    return round(mean_ms, 3), round(stdev_ms, 3), round(ci95_ms, 3)
+
 def benchmark_ecdsa():
     keygen_times, sign_times, verify_times = [], [], []
     pub_key_bytes = b""
@@ -71,6 +78,9 @@ def benchmark_ecdsa():
         verify_times.append(time.perf_counter() - t0)
 
     zero_bytes, non_zero_bytes = count_bytes_distribution(signature)
+    kg_mean, kg_std, kg_ci = calc_stats(keygen_times)
+    sg_mean, sg_std, sg_ci = calc_stats(sign_times)
+    vf_mean, vf_std, vf_ci = calc_stats(verify_times)
     
     return {
         "Category": "Baseline (Classical)",
@@ -80,9 +90,13 @@ def benchmark_ecdsa():
         "Signature_Size_Bytes": len(signature),
         "Zero_Bytes": zero_bytes,
         "Non_Zero_Bytes": non_zero_bytes,
-        "Avg_Keygen_ms": statistics.mean(keygen_times) * 1000,
-        "Avg_Sign_ms": statistics.mean(sign_times) * 1000,
-        "Avg_Verify_ms": statistics.mean(verify_times) * 1000
+        "Avg_Keygen_ms": kg_mean,
+        "StdDev_Keygen_ms": kg_std,
+        "Avg_Sign_ms": sg_mean,
+        "StdDev_Sign_ms": sg_std,
+        "Avg_Verify_ms": vf_mean,
+        "StdDev_Verify_ms": vf_std,
+        "CI95_Verify_ms": vf_ci
     }
 
 def benchmark_bls():
@@ -92,7 +106,6 @@ def benchmark_bls():
     
     for _ in range(N_TRIALS):
         t0 = time.perf_counter()
-        # True random BLS private key generation
         sk = secrets.randbelow(bls_curve_order - 1) + 1
         pub_key_bytes = bls.SkToPk(sk)
         keygen_times.append(time.perf_counter() - t0)
@@ -106,6 +119,9 @@ def benchmark_bls():
         verify_times.append(time.perf_counter() - t0)
 
     zero_bytes, non_zero_bytes = count_bytes_distribution(signature)
+    kg_mean, kg_std, kg_ci = calc_stats(keygen_times)
+    sg_mean, sg_std, sg_ci = calc_stats(sign_times)
+    vf_mean, vf_std, vf_ci = calc_stats(verify_times)
     
     return {
         "Category": "Baseline (Classical)",
@@ -115,9 +131,13 @@ def benchmark_bls():
         "Signature_Size_Bytes": len(signature),
         "Zero_Bytes": zero_bytes,
         "Non_Zero_Bytes": non_zero_bytes,
-        "Avg_Keygen_ms": statistics.mean(keygen_times) * 1000,
-        "Avg_Sign_ms": statistics.mean(sign_times) * 1000,
-        "Avg_Verify_ms": statistics.mean(verify_times) * 1000
+        "Avg_Keygen_ms": kg_mean,
+        "StdDev_Keygen_ms": kg_std,
+        "Avg_Sign_ms": sg_mean,
+        "StdDev_Sign_ms": sg_std,
+        "Avg_Verify_ms": vf_mean,
+        "StdDev_Verify_ms": vf_std,
+        "CI95_Verify_ms": vf_ci
     }
 
 def benchmark_oqs(alg_name, display_name, category, sec_level):
@@ -141,6 +161,9 @@ def benchmark_oqs(alg_name, display_name, category, sec_level):
                 verify_times.append(time.perf_counter() - t0)
 
     zero_bytes, non_zero_bytes = count_bytes_distribution(signature)
+    kg_mean, kg_std, kg_ci = calc_stats(keygen_times)
+    sg_mean, sg_std, sg_ci = calc_stats(sign_times)
+    vf_mean, vf_std, vf_ci = calc_stats(verify_times)
 
     return {
         "Category": category,
@@ -150,9 +173,13 @@ def benchmark_oqs(alg_name, display_name, category, sec_level):
         "Signature_Size_Bytes": len(signature),
         "Zero_Bytes": zero_bytes,
         "Non_Zero_Bytes": non_zero_bytes,
-        "Avg_Keygen_ms": statistics.mean(keygen_times) * 1000,
-        "Avg_Sign_ms": statistics.mean(sign_times) * 1000,
-        "Avg_Verify_ms": statistics.mean(verify_times) * 1000
+        "Avg_Keygen_ms": kg_mean,
+        "StdDev_Keygen_ms": kg_std,
+        "Avg_Sign_ms": sg_mean,
+        "StdDev_Sign_ms": sg_std,
+        "Avg_Verify_ms": vf_mean,
+        "StdDev_Verify_ms": vf_std,
+        "CI95_Verify_ms": vf_ci
     }
 
 def generate_plots(results):
@@ -161,6 +188,7 @@ def generate_plots(results):
     algs = [r["Algorithm"] for r in results]
     sig_sizes = [r["Signature_Size_Bytes"] for r in results]
     verify_times = [r["Avg_Verify_ms"] for r in results]
+    verify_stdev = [r["StdDev_Verify_ms"] for r in results]
     
     fig, ax1 = plt.subplots(figsize=(12, 6))
     
@@ -175,10 +203,10 @@ def generate_plots(results):
     ax2 = ax1.twinx()
     color = 'tab:red'
     ax2.set_ylabel('Verification Time (ms)', color=color, fontweight='bold')
-    lines = ax2.plot(algs, verify_times, color=color, marker='o', linewidth=2, label='Verify Time (ms)')
+    lines = ax2.errorbar(algs, verify_times, yerr=verify_stdev, fmt='-o', color=color, ecolor='darkred', elinewidth=1.5, capsize=3, label='Verify Time (ms ± StdDev)')
     ax2.tick_params(axis='y', labelcolor=color)
     
-    plt.title('PQ-Oracle Phase 1: Signature Size vs Verification Time Overhead', fontsize=14, fontweight='bold')
+    plt.title('PQ-Oracle Phase 1: Signature Size vs Verification Time Overhead (with StdDev)', fontsize=14, fontweight='bold')
     fig.tight_layout()
     plot_path = os.path.join("results", "pq_oracle_baseline_comparison.png")
     plt.savefig(plot_path, dpi=300)
