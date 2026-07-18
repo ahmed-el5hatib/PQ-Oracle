@@ -2,7 +2,7 @@
 > **An Adaptive Architecture for Cost-Aware Post-Quantum Signature Aggregation in DeFi Oracle Networks**
 
 [![Paper Target](https://img.shields.io/badge/Target-IEEE%20Access-blue.svg)](https://ieeeaccess.ieee.org/)
-[![Status](https://img.shields.io/badge/Status-Draft%20v1%20%7C%20Phase%201%20%26%202%20Complete-green.svg)]()
+[![Status](https://img.shields.io/badge/Status-Draft%20v1%20%7C%20Phase%201%2C%202%20%26%203%20Complete-green.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-amber.svg)](LICENSE)
 
 ---
@@ -48,9 +48,24 @@ Simulated $N$-of-$M$ Oracle network price updates across node counts $N \in \{5,
 | `Falcon-1024` | PQ - Lattice | 26.75 KB | 2.06 KB | **92.32 %** | 8.19 ms | 0.73 ms |
 | `SLH-DSA-128s` | PQ - Hash | 165.06 KB | 9.06 KB | **94.51 %** | 72.24 ms | 8.73 ms |
 
-### Key Phase 2 Takeaways:
-1. Without signature aggregation, PQC payloads scale linearly ($N \times \text{SigSize}$), causing **ML-DSA-44 to consume 50.9 KB per price update at N=21 nodes** (financially unviable on EVM).
-2. Applying PQC aggregation / sublinear batch verification reduces payload size by **up to ~94%**, bringing ML-DSA-44 down to **3.07 KB** and Falcon-512 down to **1.44 KB**.
+---
+
+## ⛽ Phase 3 EVM Gas & On-Chain Financial Benchmark
+
+Empirical EVM gas consumption and transaction costs evaluated at **30 Gwei Gas Price** and **$3,000 ETH Price** for $N=21$ consensus nodes.
+
+| Algorithm | Category | Unaggregated Gas | Aggregated Gas | **Gas Savings (%)** | Agg Tx Cost ($ USD) | Annual Cost ($ USD) |
+|---|---|---|---|---|---|---|
+| `ECDSA (secp256k1)` | Classical | 114,428 gas | **95,528 gas** | 16.52 % | **$8.60** | $4.52M |
+| `BLS12-381` | Classical | 1,004,840 gas | **100,472 gas** | **90.00 %** | **$9.04** | $4.75M |
+| `Falcon-512` | PQ - Lattice | 4,019,972 gas | **383,391 gas** | **90.46 %** | **$34.51** | $18.14M |
+| `ML-DSA-44` | PQ - Lattice | 5,851,412 gas | **512,362 gas** | **91.24 %** | **$46.11** | $24.24M |
+| `SLH-DSA-128s` | PQ - Hash | 20,419,424 gas | 1,544,154 gas | **92.44 %** | $138.97 | $73.04M |
+
+### Key Phase 3 Takeaways:
+1. **PQC Aggregation cuts EVM Gas costs by >90%**: For `ML-DSA-44`, gas drops from 5.85M gas to **512k gas**, bringing single update transaction costs from $526 to **$46.11**.
+2. **Falcon-512 is the most cost-effective PQC candidate**: At **383k gas ($34.51/update)**, Falcon-512 is ~25% cheaper on-chain than ML-DSA-44 due to smaller signature size.
+3. **Adaptive Selection Need**: Under peak gas spikes (>100 Gwei), static PQC feeds become prohibitively expensive, motivating the **Phase 4 Adaptive Engine** to dynamically adjust security thresholds or switch aggregation modes.
 
 ---
 
@@ -62,6 +77,9 @@ Simulated $N$-of-$M$ Oracle network price updates across node counts $N \in \{5,
 ### Phase 2: Oracle Consensus Aggregation Simulation
 ![Phase 2 Simulation](results/pq_oracle_network_simulation.png)
 
+### Phase 3: EVM Gas & Operational Cost Analysis
+![Phase 3 EVM Gas](results/pq_oracle_gas_cost_analysis.png)
+
 ---
 
 ## 🛠 Project Structure
@@ -70,14 +88,19 @@ Simulated $N$-of-$M$ Oracle network price updates across node counts $N \in \{5,
 PQ-Oracle/
 ├── PQ-Oracle_Proposal_and_Benchmark_Plan.md   # Core Research Proposal & Gap Analysis
 ├── README.md                                  # Repository overview & benchmark tables
+├── contracts/
+│   └── OracleVerifier.sol                     # Solidity EVM verification contract
 ├── scripts/
 │   ├── benchmark_phase1.py                    # Microbenchmarking harness (Python)
-│   └── simulate_oracle_network.py             # Phase 2 N-of-M consensus simulator
+│   ├── simulate_oracle_network.py             # Phase 2 N-of-M consensus simulator
+│   └── benchmark_evm_gas.py                   # Phase 3 EVM Gas cost engine
 └── results/
     ├── pq_oracle_baseline_results.csv         # Raw microbenchmark data
     ├── pq_oracle_baseline_comparison.png     # Phase 1 trade-off chart
     ├── pq_oracle_simulation_results.csv       # Phase 2 simulation data
-    └── pq_oracle_network_simulation.png       # Phase 2 aggregation chart
+    ├── pq_oracle_network_simulation.png       # Phase 2 aggregation chart
+    ├── pq_oracle_evm_gas_results.csv          # Phase 3 EVM Gas data
+    └── pq_oracle_gas_cost_analysis.png        # Phase 3 EVM Gas chart
 ```
 
 ---
@@ -90,6 +113,9 @@ python scripts/benchmark_phase1.py
 
 # Run Phase 2 N-of-M Oracle Consensus simulation
 python scripts/simulate_oracle_network.py
+
+# Run Phase 3 EVM Gas cost analysis
+python scripts/benchmark_evm_gas.py
 ```
 
 ---
@@ -97,6 +123,6 @@ python scripts/simulate_oracle_network.py
 ## 📝 Roadmap & Next Steps
 - [x] **Phase 1:** Baseline Microbenchmarks (ECDSA, BLS, ML-DSA, Falcon, SLH-DSA).
 - [x] **Phase 2:** N-of-M Oracle Consensus Simulator & Aggregation Model.
-- [ ] **Phase 3:** EVM On-Chain Gas Cost Measurement & Verification Contracts.
+- [x] **Phase 3:** EVM On-Chain Gas Cost Measurement & Verification Contracts.
 - [ ] **Phase 4:** Adaptive Scheme-Selection Policy Layer.
 - [ ] **Phase 5:** Publication Draft Preparation for IEEE Access.
