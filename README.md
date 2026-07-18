@@ -2,7 +2,7 @@
 > **An Adaptive Architecture for Cost-Aware Post-Quantum Signature Aggregation in DeFi Oracle Networks**
 
 [![Paper Target](https://img.shields.io/badge/Target-IEEE%20Access-blue.svg)](https://ieeeaccess.ieee.org/)
-[![Status](https://img.shields.io/badge/Status-Draft%20v1%20%7C%20Phase%201--4%20Complete-green.svg)]()
+[![Status](https://img.shields.io/badge/Status-Draft%20v1%20%7C%20Complete-green.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-amber.svg)](LICENSE)
 
 ---
@@ -46,13 +46,13 @@ Simulated $N$-of-$M$ Oracle network price updates across node counts $N \in \{5,
 | `ML-DSA-87` | PQ - Lattice | 97.25 KB | 5.27 KB | **94.58 %** | 20.79 ms | 2.08 ms |
 | `Falcon-512` | PQ - Lattice | 13.80 KB | **1.44 KB** | **89.57 %** | 4.20 ms | **0.38 ms** |
 | `Falcon-1024` | PQ - Lattice | 26.75 KB | 2.06 KB | **92.32 %** | 8.19 ms | 0.73 ms |
-| `SLH-DSA-128s` | PQ - Hash | 165.06 KB | 9.06 KB | **94.51 %** | 72.24 ms | 8.73 ms |
+| `SLH-DSA-SHA2-128s` | PQ - Hash | 165.06 KB | 9.06 KB | **94.51 %** | 72.24 ms | 8.73 ms |
 
 ---
 
-## ⛽ Phase 3 EVM Gas & On-Chain Financial Benchmark
+## ⛽ Phase 3 EVM Gas & On-Chain Financial Benchmark (All 8 Schemes)
 
-Empirical EVM gas consumption and transaction costs evaluated at **30 Gwei Gas Price** and **$3,000 ETH Price** for $N=21$ consensus nodes.
+Empirical EVM gas consumption and transaction costs evaluated at **30 Gwei Gas Price** and **$3,000 ETH Price** for $N=21$ consensus nodes across all 8 algorithms.
 
 | Algorithm | Category | Unaggregated Gas | Aggregated Gas | **Gas Savings (%)** | Agg Tx Cost ($ USD) | Annual Cost ($ USD) |
 |---|---|---|---|---|---|---|
@@ -60,7 +60,10 @@ Empirical EVM gas consumption and transaction costs evaluated at **30 Gwei Gas P
 | `BLS12-381` | Classical | 1,004,840 gas | **100,472 gas** | **90.00 %** | **$9.04** | $4.75M |
 | `Falcon-512` | PQ - Lattice | 4,019,972 gas | **383,391 gas** | **90.46 %** | **$34.51** | $18.14M |
 | `ML-DSA-44` | PQ - Lattice | 5,851,412 gas | **512,362 gas** | **91.24 %** | **$46.11** | $24.24M |
-| `SLH-DSA-128s` | PQ - Hash | 20,419,424 gas | 1,544,154 gas | **92.44 %** | $138.97 | $73.04M |
+| `Falcon-1024` | PQ - Lattice | 7,159,508 gas | **622,909 gas** | **91.30 %** | **$56.06** | $29.47M |
+| `ML-DSA-65` | PQ - Lattice | 8,238,920 gas | **693,015 gas** | **91.59 %** | **$62.37** | $32.78M |
+| `ML-DSA-87` | PQ - Lattice | 10,975,160 gas | **912,241 gas** | **91.69 %** | **$82.10** | $43.15M |
+| `SLH-DSA-SHA2-128s` | PQ - Hash | 20,419,424 gas | 1,544,154 gas | **92.44 %** | $138.97 | $73.04M |
 
 ---
 
@@ -72,14 +75,15 @@ The `PQ-Oracle` adaptive policy engine dynamically switches between post-quantum
 
 | Strategy | Security Level | 24-Hour Operational Cost ($ USD) | SLA Adherence |
 |---|---|---|---|
-| **PQ-Oracle Adaptive Engine** | **Dynamic (NIST L1 - L5)** | **$171,091** | **100 %** |
+| **PQ-Oracle Adaptive Engine** | **Dynamic (NIST L1 - L5)** | **$143,025** | **100 %** |
 | `Static Falcon-512` | Fixed NIST Level 1 | $124,536 | 100 % |
 | `Static ML-DSA-44` | Fixed NIST Level 2 | $166,430 | 100 % |
-| `Static Falcon-1024` | Fixed NIST Level 5 | $171,091 | 100 % |
+| `Static Falcon-1024` | Fixed NIST Level 5 | $202,339 | 100 % |
+| `Static ML-DSA-87` | Fixed NIST Level 5 | $296,389 | 100 % |
 
 ### Key Phase 4 Takeaways:
 1. **Dynamic Security Maxima**: During low gas price periods (<25 Gwei), `PQ-Oracle` automatically upgrades security to NIST Level 5 (`Falcon-1024` / `ML-DSA-87`) without breaching budget limits.
-2. **Congestion Protection**: During network congestion spikes (>80 Gwei), `PQ-Oracle` dynamically sheds verification complexity by switching to `Falcon-512`, avoiding budget blowouts.
+2. **Congestion Protection**: During network congestion spikes (>80 Gwei), `PQ-Oracle` dynamically sheds verification complexity by switching to `Falcon-512`, avoiding budget blowouts while maintaining 100% SLA latency adherence.
 
 ---
 
@@ -105,6 +109,12 @@ The `PQ-Oracle` adaptive policy engine dynamically switches between post-quantum
 PQ-Oracle/
 ├── PQ-Oracle_Proposal_and_Benchmark_Plan.md   # Core Research Proposal & Gap Analysis
 ├── README.md                                  # Repository overview & benchmark tables
+├── requirements.txt                           # Explicit dependency list
+├── run_all.py                                 # Master reproduction pipeline runner
+├── CHANGELOG.md                               # Project changelog
+├── CONTRIBUTING.md                            # Contribution guidelines
+├── paper/
+│   └── PQ_Oracle_IEEE_Access_Draft.md         # Complete IEEE Access manuscript draft
 ├── contracts/
 │   └── OracleVerifier.sol                     # Solidity EVM verification contract
 ├── scripts/
@@ -128,24 +138,18 @@ PQ-Oracle/
 ## 🚀 Reproduction / How to Run
 
 ```bash
-# Run Phase 1 baseline microbenchmarks
-python scripts/benchmark_phase1.py
+# Install dependencies
+pip install -r requirements.txt
 
-# Run Phase 2 N-of-M Oracle Consensus simulation
-python scripts/simulate_oracle_network.py
-
-# Run Phase 3 EVM Gas cost analysis
-python scripts/benchmark_evm_gas.py
-
-# Run Phase 4 Adaptive Policy Selection Engine
-python scripts/adaptive_engine.py
+# Run the complete end-to-end PQ-Oracle pipeline
+python run_all.py
 ```
 
 ---
 
-## 📝 Roadmap & Next Steps
+## 📝 Roadmap & Status
 - [x] **Phase 1:** Baseline Microbenchmarks (ECDSA, BLS, ML-DSA, Falcon, SLH-DSA).
 - [x] **Phase 2:** N-of-M Oracle Consensus Simulator & Aggregation Model.
 - [x] **Phase 3:** EVM On-Chain Gas Cost Measurement & Verification Contracts.
 - [x] **Phase 4:** Adaptive Scheme-Selection Policy Layer.
-- [ ] **Phase 5:** Publication Draft Preparation for IEEE Access.
+- [x] **Phase 5:** Publication Draft Preparation for IEEE Access.
