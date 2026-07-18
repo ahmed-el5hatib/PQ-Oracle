@@ -1,42 +1,82 @@
 import os
 import csv
-import math
 import random
-import matplotlib.pyplot as plt
 
-# Candidate scheme parameters: (Name, Gas_Agg_N21, Latency_ms, Security_Score 1-5)
-SCHEMES = {
-    "ECDSA": {"gas": 95528, "latency": 6.47, "security": 1.0, "pqc": False},
-    "BLS12-381": {"gas": 100472, "latency": 550.0, "security": 1.0, "pqc": False},
-    "Falcon-512": {"gas": 383391, "latency": 0.38, "security": 3.0, "pqc": True},
-    "Falcon-1024": {"gas": 526710, "latency": 0.73, "security": 5.0, "pqc": True},
-    "ML-DSA-44": {"gas": 512362, "latency": 0.78, "security": 3.0, "pqc": True},
-    "ML-DSA-87": {"gas": 895420, "latency": 2.08, "security": 5.0, "pqc": True},
-}
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    raise ImportError("Required package 'matplotlib' missing. Install via: pip install matplotlib")
 
 ETH_PRICE_USD = 3000.0
 
-def adaptive_policy(gas_price_gwei, max_cost_usd_target, max_latency_ms, require_pqc=True):
+SECURITY_SCORES = {
+    "ECDSA (secp256k1)": 1.0,
+    "BLS12-381": 1.0,
+    "Falcon-512": 3.0,
+    "ML-DSA-44": 3.0,
+    "ML-DSA-65": 4.0,
+    "Falcon-1024": 5.0,
+    "ML-DSA-87": 5.0,
+    "SLH-DSA-SHA2-128s": 3.0,
+}
+
+PQC_FLAGS = {
+    "ECDSA (secp256k1)": False,
+    "BLS12-381": False,
+    "Falcon-512": True,
+    "ML-DSA-44": True,
+    "ML-DSA-65": True,
+    "Falcon-1024": True,
+    "ML-DSA-87": True,
+    "SLH-DSA-SHA2-128s": True,
+}
+
+LATENCY_ESTIMATES_MS = {
+    "ECDSA (secp256k1)": 6.47,
+    "BLS12-381": 550.0,
+    "Falcon-512": 0.38,
+    "ML-DSA-44": 0.78,
+    "ML-DSA-65": 1.28,
+    "Falcon-1024": 0.73,
+    "ML-DSA-87": 2.08,
+    "SLH-DSA-SHA2-128s": 8.73,
+}
+
+def load_gas_models_from_csv(csv_path="results/pq_oracle_evm_gas_results.csv"):
     """
-    PQ-Oracle Adaptive Policy Selector:
-    Selects the optimal cryptographic signature scheme based on real-time gas price,
-    latency SLA, and post-quantum security requirements.
+    Dynamically loads EVM gas costs from Phase 3 CSV results for N=21 nodes.
     """
+    if not os.path.exists(csv_path):
+        raise FileNotFoundError(f"Gas results CSV not found at {csv_path}. Run benchmark_evm_gas.py first.")
+        
+    schemes = {}
+    with open(csv_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if row["Network_Nodes_N"] == "21":
+                alg = row["Algorithm"]
+                if alg not in schemes:
+                    schemes[alg] = {
+                        "gas": int(row["Agg_Total_Gas"]),
+                        "latency": LATENCY_ESTIMATES_MS.get(alg, 1.0),
+                        "security": SECURITY_SCORES.get(alg, 3.0),
+                        "pqc": PQC_FLAGS.get(alg, True)
+                    }
+    return schemes
+
+def adaptive_policy(schemes, gas_price_gwei, max_cost_usd_target, max_latency_ms, require_pqc=True):
     best_scheme = None
     best_score = float('-inf')
 
-    for name, s in SCHEMES.items():
+    for name, s in schemes.items():
         if require_pqc and not s["pqc"]:
             continue
         
         tx_cost_usd = (s["gas"] * gas_price_gwei * 1e-9) * ETH_PRICE_USD
         
-        # Hard constraint check: latency budget
         if s["latency"] > max_latency_ms:
             continue
             
-        # Multi-objective utility score:
-        # Score = Security Weight - Normalized Cost Penalty
         cost_penalty = (tx_cost_usd / max_cost_usd_target) if max_cost_usd_target > 0 else 0
         utility_score = (s["security"] * 2.0) - (cost_penalty * 3.0)
         
@@ -44,26 +84,23 @@ def adaptive_policy(gas_price_gwei, max_cost_usd_target, max_latency_ms, require
             best_score = utility_score
             best_scheme = name
             
-    # Fallback to Falcon-512 if no PQC scheme meets strict constraint
     if best_scheme is None and require_pqc:
         best_scheme = "Falcon-512"
     elif best_scheme is None:
-        best_scheme = "ECDSA"
+        best_scheme = "ECDSA (secp256k1)"
         
     return best_scheme
 
 def simulate_24h_oracle_feed():
     os.makedirs("results", exist_ok=True)
-    random.seed(42)
+    schemes = load_gas_models_from_csv()
     
-    # 24 hours simulation with 1 update per minute (1440 updates)
+    random.seed(42)
     time_steps = 1440
     gas_prices = []
     
-    # Simulate realistic gas volatility (base 20 Gwei, spikes up to 120 Gwei)
     current_gas = 25.0
     for t in range(time_steps):
-        # Peak congestion hours (hours 12-16)
         hour = (t // 60) % 24
         if 12 <= hour <= 16:
             current_gas += random.uniform(-2, 5)
@@ -75,30 +112,28 @@ def simulate_24h_oracle_feed():
 
     results = []
     
-    # Trackers for total costs
     total_cost_adaptive = 0.0
-    total_cost_static_mldsa = 0.0
+    total_cost_static_mldsa44 = 0.0
     total_cost_static_falcon512 = 0.0
     total_cost_static_falcon1024 = 0.0
     
     adaptive_choices = []
     
     for t, gwei in enumerate(gas_prices):
-        # Target max budget per update: $50 USD, max latency: 50ms
-        chosen_scheme = adaptive_policy(gwei, max_cost_usd_target=50.0, max_latency_ms=50.0, require_pqc=True)
+        chosen_scheme = adaptive_policy(schemes, gwei, max_cost_usd_target=50.0, max_latency_ms=50.0, require_pqc=True)
         adaptive_choices.append(chosen_scheme)
         
-        cost_adaptive = (SCHEMES[chosen_scheme]["gas"] * gwei * 1e-9) * ETH_PRICE_USD
-        cost_mldsa44 = (SCHEMES["ML-DSA-44"]["gas"] * gwei * 1e-9) * ETH_PRICE_USD
-        cost_falcon512 = (SCHEMES["Falcon-512"]["gas"] * gwei * 1e-9) * ETH_PRICE_USD
-        cost_falcon1024 = (SCHEMES["Falcon-1024"]["gas"] * gwei * 1e-9) * ETH_PRICE_USD
+        cost_adaptive = (schemes[chosen_scheme]["gas"] * gwei * 1e-9) * ETH_PRICE_USD
+        cost_mldsa44 = (schemes["ML-DSA-44"]["gas"] * gwei * 1e-9) * ETH_PRICE_USD
+        cost_falcon512 = (schemes["Falcon-512"]["gas"] * gwei * 1e-9) * ETH_PRICE_USD
+        cost_falcon1024 = (schemes["Falcon-1024"]["gas"] * gwei * 1e-9) * ETH_PRICE_USD
         
         total_cost_adaptive += cost_adaptive
-        total_cost_static_mldsa += cost_mldsa44
+        total_cost_static_mldsa44 += cost_mldsa44
         total_cost_static_falcon512 += cost_falcon512
         total_cost_static_falcon1024 += cost_falcon1024
         
-        if t % 60 == 0:  # Hourly snapshot
+        if t % 60 == 0:
             results.append({
                 "Hour": t // 60,
                 "Gas_Price_Gwei": round(gwei, 2),
@@ -112,7 +147,7 @@ def simulate_24h_oracle_feed():
     print(f"24h Operational Cost Summary (1,440 price updates):")
     print(f"  - PQ-Oracle Adaptive Engine: ${total_cost_adaptive:,.2f}")
     print(f"  - Static Falcon-512:         ${total_cost_static_falcon512:,.2f}")
-    print(f"  - Static ML-DSA-44:          ${total_cost_static_mldsa:,.2f}")
+    print(f"  - Static ML-DSA-44:          ${total_cost_static_mldsa44:,.2f}")
     print(f"  - Static Falcon-1024 (L5):   ${total_cost_static_falcon1024:,.2f}")
     
     csv_path = os.path.join("results", "pq_oracle_adaptive_results.csv")
@@ -122,21 +157,19 @@ def simulate_24h_oracle_feed():
         writer.writerows(results)
     print(f"Adaptive simulation saved to {csv_path}")
     
-    return gas_prices, adaptive_choices, results, total_cost_adaptive, total_cost_static_falcon512, total_cost_static_mldsa, total_cost_static_falcon1024
+    return gas_prices, adaptive_choices, results, total_cost_adaptive, total_cost_static_falcon512, total_cost_static_mldsa44, total_cost_static_falcon1024, schemes
 
-def generate_adaptive_plots(gas_prices, adaptive_choices, total_adaptive, total_f512, total_ml44, total_f1024):
+def generate_adaptive_plots(gas_prices, adaptive_choices, total_adaptive, total_f512, total_ml44, total_f1024, schemes):
     fig, axes = plt.subplots(2, 1, figsize=(14, 8), sharex=True)
     
     hours = [t / 60 for t in range(len(gas_prices))]
     
-    # Subplot 1: Gas Price fluctuations & Chosen Algorithm
     ax1 = axes[0]
     ax1.plot(hours, gas_prices, color='firebrick', linewidth=1.5, label='EVM Gas Price (Gwei)')
     ax1.set_ylabel("Gas Price (Gwei)", fontweight='bold', color='firebrick')
     ax1.set_title("EVM Gas Price Volatility & Adaptive PQC Scheme Selection", fontweight='bold', fontsize=12)
     ax1.grid(True, linestyle='--', alpha=0.5)
     
-    # Subplot 2: Cumulative Operational Cost Comparison
     ax2 = axes[1]
     cum_adaptive = []
     cum_f512 = []
@@ -146,10 +179,10 @@ def generate_adaptive_plots(gas_prices, adaptive_choices, total_adaptive, total_
     ca, cf5, cml, cf10 = 0, 0, 0, 0
     for t, gwei in enumerate(gas_prices):
         chosen = adaptive_choices[t]
-        ca += (SCHEMES[chosen]["gas"] * gwei * 1e-9) * ETH_PRICE_USD
-        cf5 += (SCHEMES["Falcon-512"]["gas"] * gwei * 1e-9) * ETH_PRICE_USD
-        cml += (SCHEMES["ML-DSA-44"]["gas"] * gwei * 1e-9) * ETH_PRICE_USD
-        cf10 += (SCHEMES["Falcon-1024"]["gas"] * gwei * 1e-9) * ETH_PRICE_USD
+        ca += (schemes[chosen]["gas"] * gwei * 1e-9) * ETH_PRICE_USD
+        cf5 += (schemes["Falcon-512"]["gas"] * gwei * 1e-9) * ETH_PRICE_USD
+        cml += (schemes["ML-DSA-44"]["gas"] * gwei * 1e-9) * ETH_PRICE_USD
+        cf10 += (schemes["Falcon-1024"]["gas"] * gwei * 1e-9) * ETH_PRICE_USD
         
         cum_adaptive.append(ca)
         cum_f512.append(cf5)
@@ -175,8 +208,8 @@ def generate_adaptive_plots(gas_prices, adaptive_choices, total_adaptive, total_
     print(f"Adaptive policy plot saved to {plot_path}")
 
 def main():
-    gas_prices, choices, results, ta, tf5, tml, tf10 = simulate_24h_oracle_feed()
-    generate_adaptive_plots(gas_prices, choices, ta, tf5, tml, tf10)
+    gas_prices, choices, results, ta, tf5, tml, tf10, schemes = simulate_24h_oracle_feed()
+    generate_adaptive_plots(gas_prices, choices, ta, tf5, tml, tf10, schemes)
 
 if __name__ == "__main__":
     main()

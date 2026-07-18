@@ -34,11 +34,10 @@ Existing literature has explored cryptographic PQC primitives and theoretical ag
 
 | Prior Work | Focus | Unresolved Gap Addressed by PQ-Oracle |
 |---|---|---|
-| *Lattice-based oracle payments (ScienceDirect 2025)* | Witness encryption for conditional payments | Focused on payment triggers; does not evaluate price-feed signature overhead or gas. |
-| *Updatable encryption for oracles (Cybersecurity 2026)* | Long-term data confidentiality | Focuses on confidentiality rather than signature size and EVM verification gas. |
-| *PQ Identity for DeFi (CMC 2025)* | Identity & trust scoring using ZKP | Evaluates identity verification; inapplicable to high-frequency price updates. |
-| *Lattice signature aggregation (JIS 2026)* | Generic distributed network aggregation | Theoretical distributed system model; lacks EVM gas measurement and smart contract deployment. |
-| *Orthus sublinear batch verification (IACR 2026)* | Sublinear proof system for lattice relations | Pure cryptographic primitive without applied oracle consensus or adaptive selection. |
+| *NIST FIPS 204 (ML-DSA) & FIPS 205 (SLH-DSA)* | Primary PQC signature standards | Standalone cryptographic definitions; no EVM on-chain cost or oracle network evaluation. |
+| *EIP-2537: Precompiles for BLS12-381 Curve Operations* | BLS verification and aggregation on EVM | Provides classical BLS precompiles; does not address post-quantum security or PQC primitives. |
+| *Open Quantum Safe (OQS) Project & liboqs* | Cross-platform C implementation of PQC primitives | Focuses on C/C++ library implementations; no smart contract gas or oracle consensus model. |
+| *Sublinear Batch Verification & Lattice Aggregation* | Cryptographic batch proof systems | Pure cryptographic constructions without applied oracle consensus or adaptive selection layer. |
 
 ---
 
@@ -46,7 +45,7 @@ Existing literature has explored cryptographic PQC primitives and theoretical ag
 
 The `PQ-Oracle` architecture consists of three interconnected layers:
 
-1. **Consensus Aggregation Layer:** Off-chain oracle nodes produce partial signatures which are aggregated using sublinear batch verification schemes (e.g., Orthus-style lattice batching).
+1. **Consensus Aggregation Layer:** Off-chain oracle nodes produce partial signatures which are aggregated using sublinear batch verification schemes (e.g., lattice-based batching).
 2. **EVM Verification Layer:** An on-chain verification smart contract (`OracleVerifier.sol`) validates batch proofs and updates target price feed state variables.
 3. **Adaptive Policy Engine:** A real-time optimization engine that evaluates:
    $$\text{Utility}(S) = w_1 \cdot \text{SecurityLevel}(S) - w_2 \cdot \left( \frac{\text{GasPrice} \times \text{GasCost}(S)}{\text{TargetBudget}} \right)$$
@@ -59,7 +58,7 @@ The `PQ-Oracle` architecture consists of three interconnected layers:
 ### A. Baseline Microbenchmarks
 * **Falcon-512** demonstrated the fastest verification latency (**0.20 ms**) and smallest PQC signature footprint (**653 Bytes**).
 * **ML-DSA-44** achieved balanced signing (1.22 ms) and verification (0.37 ms), but signature size reached **2,420 Bytes** (34x ECDSA).
-* **SLH-DSA-128s** provided conservative hash-based security with minimal public key size (32 Bytes), but signature footprint reached **7,856 Bytes** (112x ECDSA).
+* **SLH-DSA-SHA2-128s** provided conservative hash-based security with minimal public key size (32 Bytes), but signature footprint reached **7,856 Bytes** (112x ECDSA).
 
 ### B. N-of-M Oracle Aggregation Impact ($N=21$ Nodes)
 Unaggregated ML-DSA-44 payload reached **50.90 KB** per price update. Applying sublinear signature aggregation reduced total payload size to **3.07 KB** (**93.98% payload reduction**). Falcon-512 payload dropped from **13.80 KB** to **1.44 KB** (**89.57% payload reduction**).
@@ -81,6 +80,8 @@ Over a simulated 24-hour variable gas environment (1,440 updates, 15–140 Gwei)
 ---
 
 ## References
-1. NIST PQC Standardization: FIPS 204 (ML-DSA), FIPS 205 (SLH-DSA), and FN-DSA (Falcon).
-2. *Practical Sublinear Batch-Verification of Lattice Relations (Orthus)*, IACR Cryptology ePrint Archive, 2026/398.
-3. *Efficient post-quantum cryptographic signature aggregation for low-latency distributed networks*, Journal on Information Security, Springer, Feb 2026.
+1. National Institute of Standards and Technology (NIST), "FIPS 204: Module-Lattice-Based Digital Signature Standard (ML-DSA)," 2024.
+2. National Institute of Standards and Technology (NIST), "FIPS 205: Stateless Hash-Based Digital Signature Standard (SLH-DSA)," 2024.
+3. Open Quantum Safe (OQS) Project, "liboqs: C library for quantum-safe cryptographic algorithms," https://openquantumsafe.org/.
+4. Ethereum Improvement Proposal (EIP-2537), "Precompiles for BLS12-381 curve operations," https://eips.ethereum.org/EIPS/eip-2537.
+5. Chainlink Labs, "Chainlink Architecture Overview & Decentralized Oracle Networks," 2023.

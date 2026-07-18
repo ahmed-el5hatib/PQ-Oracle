@@ -1,7 +1,11 @@
 import os
 import csv
 import math
-import matplotlib.pyplot as plt
+
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    raise ImportError("Required package 'matplotlib' missing. Install via: pip install matplotlib")
 
 NETWORK_SIZES = [5, 11, 21, 31, 51]
 GAS_PRICES_GWEI = [10, 30, 50, 100]
@@ -14,7 +18,7 @@ def calc_calldata_gas(payload_bytes):
     zero_bytes = payload_bytes - non_zero_bytes
     return (non_zero_bytes * 16) + (zero_bytes * 4)
 
-# Precompile / Verification gas models
+# Precompile / Verification gas models for ALL algorithms
 VERIFY_GAS_MODELS = {
     "ECDSA (secp256k1)": {
         "unagg_func": lambda num_nodes: num_nodes * 3000,
@@ -37,6 +41,20 @@ VERIFY_GAS_MODELS = {
         "agg_payload": lambda num_nodes: 2420 + int(128 * math.log2(num_nodes)) + (num_nodes * 4),
         "category": "PQ - Lattice"
     },
+    "ML-DSA-65": {
+        "unagg_func": lambda num_nodes: num_nodes * 340000,
+        "agg_func": lambda num_nodes: 340000 + int(60000 * math.log2(num_nodes)),
+        "unagg_payload": lambda num_nodes: num_nodes * (3309 + 4),
+        "agg_payload": lambda num_nodes: 3309 + int(144 * math.log2(num_nodes)) + (num_nodes * 4),
+        "category": "PQ - Lattice"
+    },
+    "ML-DSA-87": {
+        "unagg_func": lambda num_nodes: num_nodes * 450000,
+        "agg_func": lambda num_nodes: 450000 + int(80000 * math.log2(num_nodes)),
+        "unagg_payload": lambda num_nodes: num_nodes * (4627 + 4),
+        "agg_payload": lambda num_nodes: 4627 + int(160 * math.log2(num_nodes)) + (num_nodes * 4),
+        "category": "PQ - Lattice"
+    },
     "Falcon-512": {
         "unagg_func": lambda num_nodes: num_nodes * 180000,
         "agg_func": lambda num_nodes: 180000 + int(35000 * math.log2(num_nodes)),
@@ -44,7 +62,14 @@ VERIFY_GAS_MODELS = {
         "agg_payload": lambda num_nodes: 653 + int(160 * math.log2(num_nodes)) + (num_nodes * 4),
         "category": "PQ - Lattice"
     },
-    "SLH_DSA_PURE_SHA2_128S": {
+    "Falcon-1024": {
+        "unagg_func": lambda num_nodes: num_nodes * 320000,
+        "agg_func": lambda num_nodes: 320000 + int(55000 * math.log2(num_nodes)),
+        "unagg_payload": lambda num_nodes: num_nodes * (1270 + 4),
+        "agg_payload": lambda num_nodes: 1270 + int(192 * math.log2(num_nodes)) + (num_nodes * 4),
+        "category": "PQ - Lattice"
+    },
+    "SLH-DSA-SHA2-128s": {
         "unagg_func": lambda num_nodes: num_nodes * 850000,
         "agg_func": lambda num_nodes: 850000 + int(120000 * math.log2(num_nodes)),
         "unagg_payload": lambda num_nodes: num_nodes * (7856 + 4),
@@ -67,13 +92,11 @@ def run_evm_gas_benchmark():
         fn_agg_func = model["agg_func"]
 
         for num_nodes in NETWORK_SIZES:
-            # Unaggregated calculation
             unagg_payload = fn_unagg_payload(num_nodes)
             unagg_calldata_gas = calc_calldata_gas(unagg_payload)
             unagg_verify_gas = fn_unagg_func(num_nodes)
             total_unagg_gas = BASE_TRANSACTION_GAS + STORAGE_EVENT_GAS + unagg_calldata_gas + unagg_verify_gas
 
-            # Aggregated calculation
             agg_payload = fn_agg_payload(num_nodes)
             agg_calldata_gas = calc_calldata_gas(agg_payload)
             agg_verify_gas = fn_agg_func(num_nodes)
@@ -111,15 +134,14 @@ def run_evm_gas_benchmark():
     return results
 
 def generate_gas_plots(results):
-    selected_algs = ["ECDSA (secp256k1)", "BLS12-381", "ML-DSA-44", "Falcon-512", "SLH_DSA_PURE_SHA2_128S"]
+    selected_algs = ["ECDSA (secp256k1)", "BLS12-381", "ML-DSA-44", "Falcon-512", "SLH-DSA-SHA2-128s"]
     gwei_30_data = [r for r in results if r["Gas_Price_Gwei"] == 30 and r["Network_Nodes_N"] == 21 and r["Algorithm"] in selected_algs]
 
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
 
-    # Plot 1: Total EVM Gas at N=21 (Unaggregated vs Aggregated)
     ax1 = axes[0]
     algs = [r["Algorithm"] for r in gwei_30_data]
-    unagg_gas = [r["Unagg_Total_Gas"] / 1000 for r in gwei_30_data]  # in KGas
+    unagg_gas = [r["Unagg_Total_Gas"] / 1000 for r in gwei_30_data]
     agg_gas = [r["Agg_Total_Gas"] / 1000 for r in gwei_30_data]
 
     x = range(len(algs))
@@ -134,9 +156,8 @@ def generate_gas_plots(results):
     ax1.grid(True, linestyle='--', alpha=0.5)
     ax1.legend()
 
-    # Plot 2: Annual Cost in USD (30 Gwei, 1 update/min)
     ax2 = axes[1]
-    annual_usd = [r["Annual_Agg_Cost_USD"] / 1000 for r in gwei_30_data]  # in Thousands USD
+    annual_usd = [r["Annual_Agg_Cost_USD"] / 1000 for r in gwei_30_data]
     ax2.bar(algs, annual_usd, color='darkslateblue', alpha=0.8, width=0.4)
     ax2.set_xlabel("Algorithm", fontweight='bold')
     ax2.set_ylabel("Annual Operational Cost ($k USD)", fontweight='bold')
