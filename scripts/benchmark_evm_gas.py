@@ -61,17 +61,22 @@ def run_evm_gas_benchmark():
     results = []
 
     for alg, model in VERIFY_GAS_MODELS.items():
+        fn_unagg_payload = model["unagg_payload"]
+        fn_unagg_func = model["unagg_func"]
+        fn_agg_payload = model["agg_payload"]
+        fn_agg_func = model["agg_func"]
+
         for num_nodes in NETWORK_SIZES:
             # Unaggregated calculation
-            unagg_payload = model["unagg_payload"](num_nodes)
+            unagg_payload = fn_unagg_payload(num_nodes)
             unagg_calldata_gas = calc_calldata_gas(unagg_payload)
-            unagg_verify_gas = model["unagg_func"](num_nodes)
+            unagg_verify_gas = fn_unagg_func(num_nodes)
             total_unagg_gas = BASE_TRANSACTION_GAS + STORAGE_EVENT_GAS + unagg_calldata_gas + unagg_verify_gas
 
             # Aggregated calculation
-            agg_payload = model["agg_payload"](num_nodes)
+            agg_payload = fn_agg_payload(num_nodes)
             agg_calldata_gas = calc_calldata_gas(agg_payload)
-            agg_verify_gas = model["agg_func"](num_nodes)
+            agg_verify_gas = fn_agg_func(num_nodes)
             total_agg_gas = BASE_TRANSACTION_GAS + STORAGE_EVENT_GAS + agg_calldata_gas + agg_verify_gas
 
             gas_savings_pct = ((total_unagg_gas - total_agg_gas) / total_unagg_gas) * 100
