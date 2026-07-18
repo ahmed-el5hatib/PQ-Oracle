@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+.env
+
+# Hardhat / Foundry
+node_modules/
+artifacts/
+cache/
+out/
+broadcast/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
