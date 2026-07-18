@@ -11,7 +11,6 @@ except ImportError:
 NETWORK_SIZES = [5, 11, 21, 31, 51]
 MESSAGE = b"oracle_price_update_eth_usd_1850.50_timestamp_1750000000"
 
-# Base empirical per-signature sizes from Phase 1
 BASE_METRICS = {
     "ECDSA (secp256k1)": {"pk": 88, "sig": 70, "verify_ms": 0.44, "category": "Classical"},
     "BLS12-381": {"pk": 48, "sig": 96, "verify_ms": 331.65, "category": "Classical"},
@@ -25,7 +24,7 @@ BASE_METRICS = {
 
 def simulate_unaggregated(alg, N):
     metrics = BASE_METRICS[alg]
-    node_id_overhead = 4  # 4 bytes per registered node ID on-chain
+    node_id_overhead = 4
     payload_size = N * (metrics["sig"] + node_id_overhead)
     total_verify_ms = N * metrics["verify_ms"]
     return payload_size, total_verify_ms
@@ -90,22 +89,23 @@ def run_simulation():
     return results
 
 def generate_simulation_plots(results):
-    selected_algs = ["ECDSA (secp256k1)", "BLS12-381", "ML-DSA-44", "Falcon-512", "SLH-DSA-SHA2-128s"]
+    # Include ALL 8 algorithms in the simulation charts
+    selected_algs = list(BASE_METRICS.keys())
     
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    fig, axes = plt.subplots(1, 2, figsize=(18, 7))
     
     ax1 = axes[0]
     for alg in selected_algs:
         subset = [r for r in results if r["Algorithm"] == alg]
         nodes = [r["Network_Nodes_N"] for r in subset]
         unagg_bytes = [r["Unagg_Payload_Bytes"] for r in subset]
-        ax1.plot(nodes, unagg_bytes, marker='o', linewidth=2, label=f"{alg} (Unaggregated)")
+        ax1.plot(nodes, unagg_bytes, marker='o', linewidth=2, label=f"{alg}")
         
     ax1.set_xlabel("Number of Oracle Consensus Nodes (N)", fontweight='bold')
     ax1.set_ylabel("Total Oracle Payload Size (Bytes)", fontweight='bold')
     ax1.set_title("Unaggregated Payload Size Growth", fontweight='bold', fontsize=12)
     ax1.grid(True, linestyle='--', alpha=0.5)
-    ax1.legend()
+    ax1.legend(fontsize=9)
     
     ax2 = axes[1]
     n21_data = [r for r in results if r["Network_Nodes_N"] == 21 and r["Algorithm"] in selected_algs]
@@ -122,7 +122,7 @@ def generate_simulation_plots(results):
     ax2.set_ylabel("Payload Size for N=21 Nodes (Bytes)", fontweight='bold')
     ax2.set_title("Aggregation Impact at N=21 Nodes", fontweight='bold', fontsize=12)
     ax2.set_xticks(x)
-    ax2.set_xticklabels(algs, rotation=25, ha='right')
+    ax2.set_xticklabels(algs, rotation=35, ha='right', fontsize=9)
     ax2.grid(True, linestyle='--', alpha=0.5)
     ax2.legend()
     

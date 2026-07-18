@@ -134,10 +134,11 @@ def run_evm_gas_benchmark():
     return results
 
 def generate_gas_plots(results):
-    selected_algs = ["ECDSA (secp256k1)", "BLS12-381", "ML-DSA-44", "Falcon-512", "SLH-DSA-SHA2-128s"]
+    # Include ALL 8 algorithms in the EVM Gas benchmark charts
+    selected_algs = list(VERIFY_GAS_MODELS.keys())
     gwei_30_data = [r for r in results if r["Gas_Price_Gwei"] == 30 and r["Network_Nodes_N"] == 21 and r["Algorithm"] in selected_algs]
 
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    fig, axes = plt.subplots(1, 2, figsize=(18, 7))
 
     ax1 = axes[0]
     algs = [r["Algorithm"] for r in gwei_30_data]
@@ -152,7 +153,7 @@ def generate_gas_plots(results):
     ax1.set_ylabel("Total EVM Gas per Update (kGas)", fontweight='bold')
     ax1.set_title("EVM Gas Consumption per Oracle Update (N=21)", fontweight='bold', fontsize=12)
     ax1.set_xticks(x)
-    ax1.set_xticklabels(algs, rotation=25, ha='right')
+    ax2_labels = ax1.set_xticklabels(algs, rotation=35, ha='right', fontsize=9)
     ax1.grid(True, linestyle='--', alpha=0.5)
     ax1.legend()
 
@@ -163,7 +164,7 @@ def generate_gas_plots(results):
     ax2.set_ylabel("Annual Operational Cost ($k USD)", fontweight='bold')
     ax2.set_title("Annual Oracle Operational Cost (30 Gwei, $3000 ETH)", fontweight='bold', fontsize=12)
     ax2.set_xticks(range(len(algs)))
-    ax2.set_xticklabels(algs, rotation=25, ha='right')
+    ax2.set_xticklabels(algs, rotation=35, ha='right', fontsize=9)
     ax2.grid(True, linestyle='--', alpha=0.5)
 
     plt.suptitle("PQ-Oracle Phase 3: EVM On-Chain Gas & Cost Benchmarks", fontsize=14, fontweight='bold')

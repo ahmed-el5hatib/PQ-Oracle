@@ -97,7 +97,7 @@ contract OracleVerifier {
         require(aggregatePayload.length > 0, "OracleVerifier: empty payload");
         require(timestamp <= block.timestamp + 300, "OracleVerifier: timestamp in future");
 
-        // Execute static call to PQC verification precompile if precompileAddress is provided
+        // If a precompile address is provided, execute staticcall for PQC verification
         if (precompileAddress != address(0)) {
             (bool success, bytes memory result) = precompileAddress.staticcall(
                 abi.encode(feedId, price, timestamp, aggregatePayload)
