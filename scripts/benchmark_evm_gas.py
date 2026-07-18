@@ -17,38 +17,38 @@ def calc_calldata_gas(payload_bytes):
 # Precompile / Verification gas models
 VERIFY_GAS_MODELS = {
     "ECDSA (secp256k1)": {
-        "unagg_func": lambda N: N * 3000,
-        "agg_func": lambda N: int(N * 3000 * 0.7),
-        "unagg_payload": lambda N: N * (70 + 4),
-        "agg_payload": lambda N: N * (70 + 4),
+        "unagg_func": lambda num_nodes: num_nodes * 3000,
+        "agg_func": lambda num_nodes: int(num_nodes * 3000 * 0.7),
+        "unagg_payload": lambda num_nodes: num_nodes * (70 + 4),
+        "agg_payload": lambda num_nodes: num_nodes * (70 + 4),
         "category": "Classical"
     },
     "BLS12-381": {
-        "unagg_func": lambda N: N * 45000,
-        "agg_func": lambda N: 45000 + int(N * 1200),
-        "unagg_payload": lambda N: N * (96 + 4),
-        "agg_payload": lambda N: 96 + (N * 4),
+        "unagg_func": lambda num_nodes: num_nodes * 45000,
+        "agg_func": lambda num_nodes: 45000 + int(num_nodes * 1200),
+        "unagg_payload": lambda num_nodes: num_nodes * (96 + 4),
+        "agg_payload": lambda num_nodes: 96 + (num_nodes * 4),
         "category": "Classical"
     },
     "ML-DSA-44": {
-        "unagg_func": lambda N: N * 240000,
-        "agg_func": lambda N: 240000 + int(45000 * math.log2(N)),
-        "unagg_payload": lambda N: N * (2420 + 4),
-        "agg_payload": lambda N: 2420 + int(128 * math.log2(N)) + (N * 4),
+        "unagg_func": lambda num_nodes: num_nodes * 240000,
+        "agg_func": lambda num_nodes: 240000 + int(45000 * math.log2(num_nodes)),
+        "unagg_payload": lambda num_nodes: num_nodes * (2420 + 4),
+        "agg_payload": lambda num_nodes: 2420 + int(128 * math.log2(num_nodes)) + (num_nodes * 4),
         "category": "PQ - Lattice"
     },
     "Falcon-512": {
-        "unagg_func": lambda N: N * 180000,
-        "agg_func": lambda N: 180000 + int(35000 * math.log2(N)),
-        "unagg_payload": lambda N: N * (653 + 4),
-        "agg_payload": lambda N: 653 + int(160 * math.log2(N)) + (N * 4),
+        "unagg_func": lambda num_nodes: num_nodes * 180000,
+        "agg_func": lambda num_nodes: 180000 + int(35000 * math.log2(num_nodes)),
+        "unagg_payload": lambda num_nodes: num_nodes * (653 + 4),
+        "agg_payload": lambda num_nodes: 653 + int(160 * math.log2(num_nodes)) + (num_nodes * 4),
         "category": "PQ - Lattice"
     },
     "SLH_DSA_PURE_SHA2_128S": {
-        "unagg_func": lambda N: N * 850000,
-        "agg_func": lambda N: 850000 + int(120000 * math.log2(N)),
-        "unagg_payload": lambda N: N * (7856 + 4),
-        "agg_payload": lambda N: 7856 + int(256 * math.log2(N)) + (N * 4),
+        "unagg_func": lambda num_nodes: num_nodes * 850000,
+        "agg_func": lambda num_nodes: 850000 + int(120000 * math.log2(num_nodes)),
+        "unagg_payload": lambda num_nodes: num_nodes * (7856 + 4),
+        "agg_payload": lambda num_nodes: 7856 + int(256 * math.log2(num_nodes)) + (num_nodes * 4),
         "category": "PQ - Hash-based"
     }
 }
@@ -61,17 +61,17 @@ def run_evm_gas_benchmark():
     results = []
 
     for alg, model in VERIFY_GAS_MODELS.items():
-        for N in NETWORK_SIZES:
+        for num_nodes in NETWORK_SIZES:
             # Unaggregated calculation
-            unagg_payload = model["unagg_payload"](N)
+            unagg_payload = model["unagg_payload"](num_nodes)
             unagg_calldata_gas = calc_calldata_gas(unagg_payload)
-            unagg_verify_gas = model["unagg_func"](N)
+            unagg_verify_gas = model["unagg_func"](num_nodes)
             total_unagg_gas = BASE_TRANSACTION_GAS + STORAGE_EVENT_GAS + unagg_calldata_gas + unagg_verify_gas
 
             # Aggregated calculation
-            agg_payload = model["agg_payload"](N)
+            agg_payload = model["agg_payload"](num_nodes)
             agg_calldata_gas = calc_calldata_gas(agg_payload)
-            agg_verify_gas = model["agg_func"](N)
+            agg_verify_gas = model["agg_func"](num_nodes)
             total_agg_gas = BASE_TRANSACTION_GAS + STORAGE_EVENT_GAS + agg_calldata_gas + agg_verify_gas
 
             gas_savings_pct = ((total_unagg_gas - total_agg_gas) / total_unagg_gas) * 100
@@ -87,7 +87,7 @@ def run_evm_gas_benchmark():
                 results.append({
                     "Algorithm": alg,
                     "Category": model["category"],
-                    "Network_Nodes_N": N,
+                    "Network_Nodes_N": num_nodes,
                     "Gas_Price_Gwei": gwei,
                     "Unagg_Total_Gas": total_unagg_gas,
                     "Agg_Total_Gas": total_agg_gas,
