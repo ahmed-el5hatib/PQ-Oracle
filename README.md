@@ -60,7 +60,7 @@ Empirical EVM gas consumption and transaction costs evaluated at **30 Gwei Gas P
 | `BLS12-381` | Classical | 1,004,840 gas | **100,472 gas** | **90.00 %** | **$9.04** | $4.75M |
 | `Falcon-512` | PQ - Lattice | 4,019,972 gas | **383,391 gas** | **90.46 %** | **$34.51** | $18.14M |
 | `ML-DSA-44` | PQ - Lattice | 5,851,412 gas | **512,362 gas** | **91.24 %** | **$46.11** | $24.24M |
-| `Falcon-1024` | PQ - Lattice | 7,159,508 gas | **622,909 gas** | **91.30 %** | **$56.06** | $29.47M |
+| `Falcon-1024` | PQ - Lattice | 7,159,508 gas | **622,909 gas** | **91.60 %** | **$56.06** | $29.47M |
 | `ML-DSA-65` | PQ - Lattice | 8,238,920 gas | **693,015 gas** | **91.59 %** | **$62.37** | $32.78M |
 | `ML-DSA-87` | PQ - Lattice | 10,975,160 gas | **912,241 gas** | **91.69 %** | **$82.10** | $43.15M |
 | `SLH-DSA-SHA2-128s` | PQ - Hash | 20,419,424 gas | 1,544,154 gas | **92.44 %** | $138.97 | $73.04M |
@@ -75,15 +75,24 @@ The `PQ-Oracle` adaptive policy engine dynamically switches between post-quantum
 
 | Strategy | Security Level | 24-Hour Operational Cost ($ USD) | SLA Adherence |
 |---|---|---|---|
-| **PQ-Oracle Adaptive Engine** | **Dynamic (NIST L1 - L5)** | **$143,025** | **100 %** |
+| **PQ-Oracle Adaptive Engine** | **Dynamic (NIST L1 - L5)** | **$202,339** | **100 %** |
 | `Static Falcon-512` | Fixed NIST Level 1 | $124,536 | 100 % |
 | `Static ML-DSA-44` | Fixed NIST Level 2 | $166,430 | 100 % |
 | `Static Falcon-1024` | Fixed NIST Level 5 | $202,339 | 100 % |
-| `Static ML-DSA-87` | Fixed NIST Level 5 | $296,389 | 100 % |
+| `Static ML-DSA-87` | Fixed NIST Level 5 | $296,323 | 100 % |
 
-### Key Phase 4 Takeaways:
-1. **Dynamic Security Maxima**: During low gas price periods (<25 Gwei), `PQ-Oracle` automatically upgrades security to NIST Level 5 (`Falcon-1024` / `ML-DSA-87`) without breaching budget limits.
-2. **Congestion Protection**: During network congestion spikes (>80 Gwei), `PQ-Oracle` dynamically sheds verification complexity by switching to `Falcon-512`, avoiding budget blowouts while maintaining 100% SLA latency adherence.
+---
+
+## 🛰️ Phase 5 Distributed Oracle Testbed Prototype
+
+Phase 5 introduces an asynchronous, multi-node distributed oracle prototype supporting real-world network phenomena and fault injection across $N \in \{5, 11, 21, 31, 51\}$ nodes and $k$-of-$N$ threshold consensus quorums ($3/5, 7/11, 15/21, 21/31, 34/51$).
+
+### Key Features & Capabilities:
+- **Independent Oracle Nodes (`nodes/`):** Asynchronous node processes managing keypairs, periodic signed updates, and state.
+- **Configurable Network Layer (`network/`):** Simulates network latency (12ms), jitter (3ms), packet loss (2%), packet duplication (1%), out-of-order delivery, and node disconnects.
+- **Aggregator Service (`aggregator/`):** Enforces threshold consensus, signature verification, and report aggregation.
+- **Byzantine Fault Injection (`faults/`):** Simulates 10% Byzantine node ratio, price tampering, invalid signatures, replay attacks, and node crashes.
+- **System Metrics:** Tracks throughput (updates/s), E2E latency, CPU utilization (%), RAM footprint (MB), network bandwidth (KB), and verification failure rates.
 
 ---
 
@@ -98,8 +107,14 @@ The `PQ-Oracle` adaptive policy engine dynamically switches between post-quantum
 ### Phase 3: EVM Gas & Operational Cost Analysis
 ![Phase 3 EVM Gas](results/pq_oracle_gas_cost_analysis.png)
 
+### Phase 3 Sensitivity Analysis across Market Conditions
+![Phase 3 Sensitivity](results/pq_oracle_gas_sensitivity.png)
+
 ### Phase 4: Adaptive Selection Policy Engine
 ![Phase 4 Adaptive Engine](results/pq_oracle_adaptive_policy.png)
+
+### Phase 5: Distributed Oracle Testbed Evaluation
+![Phase 5 Distributed Testbed](results/pq_oracle_phase5_distributed_testbed.png)
 
 ---
 
@@ -110,13 +125,27 @@ PQ-Oracle/
 ├── PQ-Oracle_Proposal_and_Benchmark_Plan.md   # Core Research Proposal & Gap Analysis
 ├── README.md                                  # Repository overview & benchmark tables
 ├── requirements.txt                           # Explicit dependency list
-├── run_all.py                                 # Master reproduction pipeline runner
+├── run_all.py                                 # Master reproduction pipeline runner (Phases 1-5)
+├── run_phase5.py                              # Standalone Phase 5 testbed runner
 ├── CHANGELOG.md                               # Project changelog
 ├── CONTRIBUTING.md                            # Contribution guidelines
 ├── paper/
 │   └── PQ_Oracle_IEEE_Access_Draft.md         # Complete IEEE Access manuscript draft
 ├── contracts/
 │   └── OracleVerifier.sol                     # Solidity EVM verification contract
+├── nodes/
+│   └── oracle_node.py                         # Phase 5 independent oracle node process
+├── network/
+│   └── network_emulator.py                    # Phase 5 network layer (latency, loss, jitter)
+├── aggregator/
+│   └── aggregator_service.py                  # Phase 5 threshold consensus aggregator
+├── faults/
+│   └── fault_injector.py                      # Phase 5 Byzantine fault injector
+├── configs/
+│   └── phase5_config.json                     # Phase 5 testbed configuration
+├── phase5/
+│   ├── benchmark_phase5.py                    # Phase 5 async benchmark harness
+│   └── plot_phase5.py                         # Phase 5 visualizer (8 subplots)
 ├── scripts/
 │   ├── benchmark_phase1.py                    # Microbenchmarking harness (Python)
 │   ├── simulate_oracle_network.py             # Phase 2 N-of-M consensus simulator
@@ -129,8 +158,12 @@ PQ-Oracle/
     ├── pq_oracle_network_simulation.png       # Phase 2 aggregation chart
     ├── pq_oracle_evm_gas_results.csv          # Phase 3 EVM Gas data
     ├── pq_oracle_gas_cost_analysis.png        # Phase 3 EVM Gas chart
+    ├── pq_oracle_gas_sensitivity.png          # Phase 3 Sensitivity chart
     ├── pq_oracle_adaptive_results.csv         # Phase 4 Adaptive simulation data
-    └── pq_oracle_adaptive_policy.png          # Phase 4 Adaptive policy chart
+    ├── pq_oracle_adaptive_policy.png          # Phase 4 Adaptive policy chart
+    ├── pq_oracle_phase5_results.csv           # Phase 5 Distributed testbed CSV
+    ├── pq_oracle_phase5_results.json          # Phase 5 Distributed testbed JSON
+    └── pq_oracle_phase5_distributed_testbed.png # Phase 5 Distributed testbed chart
 ```
 
 ---
@@ -141,8 +174,11 @@ PQ-Oracle/
 # Install dependencies
 pip install -r requirements.txt
 
-# Run the complete end-to-end PQ-Oracle pipeline
+# Run the complete end-to-end PQ-Oracle pipeline (Phases 1 through 5)
 python run_all.py
+
+# Or run Phase 5 Distributed Testbed standalone
+python run_phase5.py
 ```
 
 ---
@@ -152,4 +188,4 @@ python run_all.py
 - [x] **Phase 2:** N-of-M Oracle Consensus Simulator & Aggregation Model.
 - [x] **Phase 3:** EVM On-Chain Gas Cost Measurement & Verification Contracts.
 - [x] **Phase 4:** Adaptive Scheme-Selection Policy Layer.
-- [x] **Phase 5:** Publication Draft Preparation for IEEE Access.
+- [x] **Phase 5:** Asynchronous Distributed Oracle Network Testbed & Fault Injector.

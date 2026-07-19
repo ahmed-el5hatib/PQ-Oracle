@@ -1,0 +1,34 @@
+{
+  "network_topologies": [
+    {"n": 5, "k": 3},
+    {"n": 11, "k": 7},
+    {"n": 21, "k": 15},
+    {"n": 31, "k": 21},
+    {"n": 51, "k": 34}
+  ],
+  "evaluated_algorithms": [
+    "ECDSA (secp256k1)",
+    "BLS12-381",
+    "Falcon-512",
+    "ML-DSA-44",
+    "SLH-DSA-SHA2-128s"
+  ],
+  "network_params": {
+    "latency_ms": 12.0,
+    "jitter_ms": 3.0,
+    "packet_loss_rate": 0.02,
+    "duplicate_rate": 0.01,
+    "out_of_order_rate": 0.01
+  },
+  "fault_params": {
+    "byzantine_node_ratio": 0.10,
+    "tamper_price_rate": 0.05,
+    "invalid_sig_rate": 0.05,
+    "replay_attack_rate": 0.02,
+    "crash_rate": 0.02
+  },
+  "benchmark": {
+    "num_rounds": 10,
+    "feed_id": "ETH_USD"
+  }
+}

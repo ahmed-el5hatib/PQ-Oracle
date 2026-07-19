@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 PQ-Oracle: Master Reproduction Pipeline
-Runs all benchmarking and simulation scripts sequentially to reproduce
-all empirical data, CSV artifacts, and visual charts.
+Runs all benchmarking, simulation, and distributed testbed scripts sequentially to reproduce
+all empirical data, CSV artifacts, JSON metrics, and visual charts across Phases 1 through 5.
 """
 
 import sys
@@ -47,10 +47,13 @@ def main():
     # Phase 4: Adaptive Scheme Selection Engine
     run_step("Phase 4: Adaptive Scheme Selection Engine", "scripts/adaptive_engine.py")
     
+    # Phase 5: Distributed Oracle Testbed Evaluation
+    run_step("Phase 5: Distributed Oracle Testbed Prototype", "run_phase5.py")
+    
     total_time = time.time() - start_time
     
     print("\n=======================================================")
-    print(f"[SUCCESS] All PQ-Oracle Benchmarks Executed Successfully in {total_time:.2f}s!")
+    print(f"[SUCCESS] All PQ-Oracle Benchmarks (Phases 1-5) Executed Successfully in {total_time:.2f}s!")
     print("=======================================================")
     print("Artifacts generated in /results/ directory:")
     print("  - pq_oracle_baseline_results.csv")
@@ -59,8 +62,12 @@ def main():
     print("  - pq_oracle_network_simulation.png")
     print("  - pq_oracle_evm_gas_results.csv")
     print("  - pq_oracle_gas_cost_analysis.png")
+    print("  - pq_oracle_gas_sensitivity.png")
     print("  - pq_oracle_adaptive_results.csv")
     print("  - pq_oracle_adaptive_policy.png")
+    print("  - pq_oracle_phase5_results.csv")
+    print("  - pq_oracle_phase5_results.json")
+    print("  - pq_oracle_phase5_distributed_testbed.png")
     print("=======================================================\n")
 
 if __name__ == "__main__":
